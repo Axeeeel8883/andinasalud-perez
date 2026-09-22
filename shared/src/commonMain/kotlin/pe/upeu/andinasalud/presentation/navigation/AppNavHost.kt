@@ -13,6 +13,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.mp.KoinPlatform
 import pe.upeu.andinasalud.domain.model.*
 import pe.upeu.andinasalud.presentation.citas.*
@@ -23,7 +25,7 @@ import pe.upeu.andinasalud.presentation.perfil.PerfilScreen
 import pe.upeu.andinasalud.presentation.solicitud.*
 import pe.upeu.andinasalud.presentation.theme.AndinaSaludTheme
 
-object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const val PERFIL = "perfil"; const val SOLICITUD = "solicitud"; const val AJUSTES = "ajustes"; const val DETALLE = "detalle/" }
+object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const val PERFIL = "perfil"; const val SOLICITUD = "solicitud"; const val AJUSTES = "ajustes"; const val DETALLE = "detalle/"; const val REPROGRAMAR = "reprogramar/" }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun AppNavHost() {
     val vm = viewModel { KoinPlatform.getKoin().get<CitasViewModel>() }
@@ -31,6 +33,7 @@ object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const 
     val oscuro by vm.oscuro.collectAsState()
     val busqueda by vm.busqueda.collectAsState()
     val filtro by vm.filtro.collectAsState()
+    val soloHoy by vm.soloHoy.collectAsState()
     val visibles by vm.visibles.collectAsState()
     var pila by rememberSaveable { mutableStateOf(listOf(Destinos.INICIO)) }
     var numeroFormulario by rememberSaveable { mutableStateOf(0) }
@@ -47,7 +50,10 @@ object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const 
         }, bottomBar = {
             NavigationBar {
                 listOf(Triple(Destinos.INICIO, "Inicio", Icons.Default.Home), Triple(Destinos.CITAS, "Citas", Icons.Default.DateRange), Triple(Destinos.PERFIL, "Perfil", Icons.Default.Person)).forEach { (destino, texto, icono) ->
-                    NavigationBarItem(selected = pila.first() == destino, onClick = { pila = listOf(destino) }, icon = { Icon(icono, texto) }, label = { Text(texto) })
+                    NavigationBarItem(selected = pila.first() == destino, onClick = { pila = listOf(destino) }, icon = {
+                        if (destino == Destinos.CITAS && estado is UiState.Contenido) BadgedBox(badge = { Badge { Text((estado as UiState.Contenido<Panel>).datos.citas.count { it.estado is EstadoCita.Programada }.toString()) } }) { Icon(icono, texto) }
+                        else Icon(icono, texto)
+                    }, label = { Text(texto) })
                 }
             }
         }) { padding ->
@@ -63,7 +69,7 @@ object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const 
                 } else EstadoContenido(estado, { vm.simular("Normal") }) { panel ->
                     when {
                         ruta == Destinos.INICIO -> InicioScreen(panel, panel.citas.filter { it.estado is EstadoCita.Programada && it.momento > Clock.System.now() }.minByOrNull { it.momento }, { ir(Destinos.DETALLE + it) }, { pila = listOf(Destinos.CITAS) }, solicitar)
-                        ruta == Destinos.CITAS -> CitasScreen(visibles, busqueda, filtro, vm::buscar, vm::filtrar, { ir(Destinos.DETALLE + it) }, solicitar)
+                        ruta == Destinos.CITAS -> CitasScreen(visibles, busqueda, filtro, soloHoy, vm.politica.puedeSolicitar(panel.citas, panel.catalogo.paciente.id), vm::buscar, vm::filtrar, vm::filtrarHoy, { ir(Destinos.DETALLE + it) }, solicitar)
                         ruta == Destinos.PERFIL -> PerfilScreen(panel.catalogo.paciente, oscuro, vm::tema) { ir(Destinos.AJUSTES) }
                         ruta == Destinos.SOLICITUD -> {
                             val formulario = viewModel(key = "solicitud-$numeroFormulario") { KoinPlatform.getKoin().get<SolicitudViewModel>() }
@@ -77,7 +83,20 @@ object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const 
                             val detalle = viewModel(key = "detalle-$id") { KoinPlatform.getKoin().get<DetalleCitaViewModel>() }
                             val accion by detalle.estado.collectAsState()
                             if(cita == null) Mensaje("Cita no encontrada", "Regresa a la lista para consultar tus citas.")
-                            else DetalleCitaScreen(cita, vm.politica.puedeCancelar(cita), accion) { detalle.cancelar(cita.id) }
+                            else DetalleCitaScreen(cita, vm.politica.puedeCancelar(cita), accion, { detalle.cancelar(cita.id) }, { ir(Destinos.REPROGRAMAR + cita.id) })
+                        }
+                        ruta.startsWith(Destinos.REPROGRAMAR) -> {
+                            val id = ruta.removePrefix(Destinos.REPROGRAMAR).toLongOrNull()
+                            val cita = panel.citas.firstOrNull { it.id == id }
+                            if (cita == null) Mensaje("Cita no encontrada", "Regresa a la lista para consultar tus citas.")
+                            else {
+                                val local = cita.momento.toLocalDateTime(TimeZone.currentSystemDefault())
+                                var solicitudReprogramada by remember(cita.id) { mutableStateOf(Solicitud(cita.medico.especialidad, cita.sede, cita.medico.id, local.date.toString(), local.time.toString().take(5), cita.motivo, cita.modalidad)) }
+                                val detalle = viewModel(key = "reprogramar-$id") { KoinPlatform.getKoin().get<DetalleCitaViewModel>() }
+                                val accion by detalle.estado.collectAsState()
+                                SolicitudScreen(panel.catalogo, FormularioUiState(solicitudReprogramada, accion.error?.let { mapOf("general" to it) } ?: emptyMap(), accion.procesando), { solicitudReprogramada = it }, { detalle.reprogramar(cita.id, solicitudReprogramada) }, "Reprogramar cita", "Guardar nueva fecha")
+                                LaunchedEffect(accion.completada) { if (accion.completada) pila = pila.dropLast(1) }
+                            }
                         }
                     }
                 }
@@ -85,3 +104,4 @@ object Destinos { const val INICIO = "inicio"; const val CITAS = "citas"; const 
         }
     }
 }
+
