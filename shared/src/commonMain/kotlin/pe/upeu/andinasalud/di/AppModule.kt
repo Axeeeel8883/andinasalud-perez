@@ -16,9 +16,11 @@ val appModule = module {
     factory { ObtenerCatalogoUseCase(get()) }
     factory { SolicitarCitaUseCase(get(), get()) }
     factory { CancelarCitaUseCase(get(), get()) }
+    factory { ReprogramarCitaUseCase(get(), get()) }
     factory { CitasViewModel(get(), get(), get(), get()) }
     factory { SolicitudViewModel(get()) }
-    factory { DetalleCitaViewModel(get()) }
+    factory { DetalleCitaViewModel(get(), get()) }
 }
 private var iniciado = false
 fun iniciarKoin() { if (!iniciado) { startKoin { modules(appModule) }; iniciado = true } }
+
