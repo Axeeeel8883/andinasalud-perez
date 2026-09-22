@@ -23,16 +23,19 @@ class CitasViewModel(private val repository: CitaRepository, private val obtener
     val busqueda = mutableBusqueda.asStateFlow()
     private val mutableFiltro = MutableStateFlow("Todas")
     val filtro = mutableFiltro.asStateFlow()
+    private val mutableSoloHoy = MutableStateFlow(false)
+    val soloHoy = mutableSoloHoy.asStateFlow()
     private val mutableOscuro = MutableStateFlow(false)
     val oscuro = mutableOscuro.asStateFlow()
     private var carga: Job? = null
     private var escenario = "Normal"
-    val visibles = combine(estado, busqueda, filtro) { e, b, f ->
-        if(e is UiState.Contenido) obtener.filtrar(e.datos.citas, f, b) else emptyList()
+    val visibles = combine(estado, busqueda, filtro, soloHoy) { e, b, f, hoy ->
+        if(e is UiState.Contenido) obtener.filtrar(e.datos.citas, f, b, hoy) else emptyList()
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     init { viewModelScope.launch { repository.cambios.collect { recargar() } } }
     fun buscar(valor: String) { mutableBusqueda.value = valor }
     fun filtrar(valor: String) { mutableFiltro.value = valor }
+    fun filtrarHoy(valor: Boolean) { mutableSoloHoy.value = valor }
     fun tema(valor: Boolean) { mutableOscuro.value = valor }
     fun simular(valor: String) { escenario = valor; recargar() }
     fun recargar() {
@@ -55,3 +58,4 @@ class CitasViewModel(private val repository: CitaRepository, private val obtener
         }
     }
 }
+
