@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import pe.upeu.andinasalud.domain.model.*
 import pe.upeu.andinasalud.presentation.components.*
 
-@Composable fun DetalleCitaScreen(cita: Cita, puedeCancelar: Boolean, accion: AccionUiState, cancelar: () -> Unit) {
+@Composable fun DetalleCitaScreen(cita: Cita, puedeCancelar: Boolean, accion: AccionUiState, cancelar: () -> Unit, reprogramar: () -> Unit) {
     var confirmar by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Detalle de cita", style = MaterialTheme.typography.headlineMedium)
@@ -24,10 +24,15 @@ import pe.upeu.andinasalud.presentation.components.*
             is EstadoCita.Cancelada -> Text("Motivo de cancelación: ${estado.motivo}")
             is EstadoCita.Programada -> {
                 Text(if(estado.recordatorioActivo) "Recordatorio activo" else "Recordatorio desactivado")
+                OutlinedButton(onClick = reprogramar, enabled = !accion.procesando, modifier = Modifier.fillMaxWidth()) { Text("Reprogramar cita") }
                 Button(onClick = { confirmar = true }, enabled = puedeCancelar && !accion.procesando, modifier = Modifier.fillMaxWidth()) { Text(if(accion.procesando) "Cancelando…" else "Cancelar cita") }
                 Text("Puedes cancelar con más de 24 horas de anticipación.", style = MaterialTheme.typography.bodySmall)
             }
             is EstadoCita.Atendida -> Unit
+        }
+        if (cita.reprogramaciones.isNotEmpty()) {
+            Text("Historial de reprogramaciones", style = MaterialTheme.typography.titleMedium)
+            cita.reprogramaciones.forEach { Text("${it.momentoAnterior} → ${it.momentoNuevo}", style = MaterialTheme.typography.bodySmall) }
         }
         accion.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
@@ -36,3 +41,4 @@ import pe.upeu.andinasalud.presentation.components.*
         confirmButton = { TextButton(onClick = { confirmar = false; cancelar() }) { Text("Sí, cancelar") } },
         dismissButton = { TextButton(onClick = { confirmar = false }) { Text("Conservar cita") } })
 }
+
