@@ -2,6 +2,9 @@ package pe.upeu.andinasalud.presentation.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -20,6 +23,10 @@ fun Cita.fechaHora(): String {
             Text(cita.medico.especialidad, style = MaterialTheme.typography.titleMedium)
             Text(cita.medico.nombre, style = MaterialTheme.typography.bodyLarge)
             Text("${cita.sede}  •  ${cita.fechaHora()}", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (cita.modalidad == ModalidadAtencion.PRESENCIAL) Icons.Default.LocationOn else Icons.Default.Videocam, cita.modalidad.etiqueta, modifier = Modifier.size(18.dp))
+                Text(cita.modalidad.etiqueta, style = MaterialTheme.typography.labelMedium)
+            }
             Text(cita.estado.etiqueta, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
         }
     }
@@ -55,3 +62,4 @@ fun Cita.fechaHora(): String {
         if(error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
 }
+
