@@ -1,0 +1,11 @@
+// Alternativa para entornos Windows cuyo Test Worker no puede abrir su socket local.
+// Ejecuta exactamente las mismas clases JUnit; no sustituye ni altera las aserciones.
+gradle.projectsEvaluated {
+    def shared = gradle.rootProject.project(':shared')
+    shared.tasks.register('verificarJUnitDirecto', JavaExec) {
+        dependsOn 'compileDebugUnitTestKotlinAndroid'
+        classpath = shared.tasks.getByName('testDebugUnitTest').classpath
+        mainClass = 'org.junit.runner.JUnitCore'
+        args 'pe.upeu.andinasalud.domain.ReglasCitasTest', 'pe.upeu.andinasalud.presentation.CitasViewModelTest'
+    }
+}

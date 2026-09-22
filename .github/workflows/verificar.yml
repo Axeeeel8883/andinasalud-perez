@@ -1,0 +1,53 @@
+name: Verificar Android e iOS
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew && ./gradlew :androidApp:assembleDebug :androidApp:lintDebug :shared:testDebugUnitTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-apk-pruebas
+          path: |
+            androidApp/build/outputs/apk/debug/*.apk
+            shared/build/reports/tests/
+            androidApp/build/reports/lint-results-debug.html
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compilar aplicación iOS
+        run: |
+          chmod +x gradlew
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme AndinaSalud -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build
+      - name: Ejecutar en simulador y capturar inicio
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" build/ios/Build/Products/Debug-iphonesimulator/AndinaSalud.app
+          xcrun simctl launch "$DEVICE" pe.upeu.andinasalud
+          sleep 15
+          xcrun simctl io "$DEVICE" screenshot build/ios/inicio-ios.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-evidencia
+          path: |
+            build/ios/inicio-ios.png
+            build/ios/Logs/Build/
